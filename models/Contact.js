@@ -54,7 +54,7 @@ export const contactsAddSchema = Joi.object({
       'string.pattern.base':
         'Phone number must be must be in the format (XXX) XXX-XXXX',
     }),
-  favorite: Joi.boolean().required()
+  favorite: Joi.boolean()
 });
 
 export const contactUpdateFavoriteSchema = Joi.object({
