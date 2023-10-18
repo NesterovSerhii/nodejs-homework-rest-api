@@ -6,10 +6,11 @@ import { isEmptyBody, authenticate } from "../../middlewares/index.js";
 
 import { validateBody } from "../../decorators/index.js";
 
-import { userSignupSchema, userLoginSchema } from "../../models/User.js";
+import { userSignupSchema, userLoginSchema, updateSubscriptionSchema } from "../../models/User.js";
 
 const userSignupValidate = validateBody(userSignupSchema)
 const userSigninValidate = validateBody(userLoginSchema)
+const userUpdateFavorite = validateBody(updateSubscriptionSchema)
 
 const authRouter = express.Router();
 
@@ -21,6 +22,6 @@ authRouter.get('/current', authenticate, authController.getCurrent);
 
 authRouter.post('/logout', authenticate, authController.logout);
 
-authRouter.patch('/users', authenticate, userSigninValidate, authController.updateSubscription);
+authRouter.patch('/', authenticate, userUpdateFavorite, authController.updateSubscription);
 
 export default authRouter;

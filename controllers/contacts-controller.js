@@ -32,7 +32,7 @@ const getContactById = async (req, res) => {
 const addContact = async (req, res) => {
   const { body } = req;
   const { _id: owner } = req.user;
-  const result = await Contact.create(...body, owner);
+  const result = await Contact.create({...body, owner});
   res.status(201).json(result);
 };
 
