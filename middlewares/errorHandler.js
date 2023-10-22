@@ -15,7 +15,7 @@ const handleBadRequest = (err, req, res, next) => {
 };
 
 const handleInternalServerError = (err, req, res, next) => {
-  res.status(500).json({ message: err.message });
+  res.status(err.status || 500).json({ message: err.message });
 };
 
 export { handleNotFound, handleBadRequest, handleInternalServerError };
