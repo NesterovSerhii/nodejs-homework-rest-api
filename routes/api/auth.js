@@ -6,15 +6,23 @@ import { isEmptyBody, authenticate, upload } from "../../middlewares/index.js";
 
 import { validateBody } from "../../decorators/index.js";
 
-import { userSignupSchema, userLoginSchema, updateSubscriptionSchema } from "../../models/User.js";
+import { userSignupSchema, userLoginSchema, updateSubscriptionSchema, userEmailSchema } from "../../models/User.js";
 
-const userSignupValidate = validateBody(userSignupSchema)
-const userSigninValidate = validateBody(userLoginSchema)
-const userUpdateFavorite = validateBody(updateSubscriptionSchema)
+const userSignupValidate = validateBody(userSignupSchema);
+
+const userSigninValidate = validateBody(userLoginSchema);
+
+const userUpdateFavorite = validateBody(updateSubscriptionSchema);
+
+const userEmailValidate = validateBody(userEmailSchema);
 
 const authRouter = express.Router();
 
-authRouter.post('/register', upload.single("poster"), isEmptyBody, userSignupValidate, authController.register);
+authRouter.post('/register', isEmptyBody, userSignupValidate, authController.register);
+
+authRouter.get("/verify/:verificationToken", authController.verify);
+
+authRouter.post("/verify", userEmailValidate, authController.resendVerifyEmail);
 
 authRouter.post('/login', isEmptyBody, userSigninValidate, authController.login);
 
