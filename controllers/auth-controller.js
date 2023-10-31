@@ -1,4 +1,4 @@
-import HttpError from '../helpers/HttpError.js';
+import { HttpError, sendEmail } from '../helpers/index.js';
 import { ctrlWrapper } from '../decorators/index.js';
 import User from '../models/User.js';
 
@@ -15,79 +15,105 @@ import path from "path";
 const avatarsPath = path.resolve("public", "avatars");
 
 import Jimp from 'jimp';
+import { nanoid } from 'nanoid';
 
-const { JWT_SECRET } = process.env;
+const { JWT_SECRET, BASE_URL } = process.env;
 
+const register = async(req, res, next) => {
+    const {password, email} = req.body
+    req.body.password = await bcrypt.hash(password, 10);
+    req.body.avatarURL = gravatar.url(email, { protocol: 'https', d: "mp" });
+    req.body.verificationToken = nanoid();
 
-const register = async (req, res) => {
-  const { email, password, subscription } = req.body;
+    const verifyEmail = {
+        to: email,
+        subject: "Verify email",
+        html: `<a target="_blank" href="${BASE_URL}/api/users/verify/${req.body.verificationToken}">Click to verify email</a>`
+    }
+    await sendEmail(verifyEmail);
+    const {  subscription, avatarURL } = await User.create(req.body);
+    res.status(201).json({
+      user: {
+      email,
+      subscription,
+      avatarURL
+     }
+    })
+}
 
-  const user = await User.findOne({ email });
-  
-const timestamp = Date.now();
-const url = gravatar.url(`${email}?t=${timestamp}`, {s: '200', r: 'pg', d: '404'});
+const verify = async (req, res) => {
+    const { verificationToken } = req.params;
+    const user = await User.findOne({ verificationToken });
+    if (!user) {
+        throw HttpError(404, "User not found")
+    }
 
-  if (user) {
-   return res.status(409).json({
-      message: 'Email in use',
-    });
-  }
+    await User.findByIdAndUpdate(user._id, { verify: true, verificationToken: "null" });
 
-  const hashPassword = await bcrypt.hash(password, 10);
+    res.status(200).json({
+        message: "Verification successful"
+    })
+}
 
-  const result = await User.create({
-    ...req.body,
-    password: hashPassword,
-    subscription,
-    avatarURL: url,
-  });
+const resendVerifyEmail = async (req, res) => {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) {
+        throw HttpError(404, "Email not found")
+    }
 
-  res.status(201).json({
-    "user": {
-    email: result.email,
-    subscription: result.subscription}  
-  });
-};
+    if (user.verify) {
+        throw HttpError(400, "Verification has already been passed")
+    }
 
-const login = async (req, res, next) => {
-  try {
+    const verifyEmail = {
+        to: email,
+        subject: "Verify email",
+        html: `<a target="_blank" href="${BASE_URL}/api/users/verify/${user.verificationToken}">Click to verify email</a>`
+    }
+
+    await sendEmail(verifyEmail);
+
+    res.status(200).json({
+        message: "Verification email sent"
+    })
+}
+
+const login = async(req, res, next) => {
     const { email, password } = req.body
     const user = await User.findOne({ email })
 
     if (!user) {
-      throw HttpError(401, "Email or password is wrong")
+       throw HttpError(401,"Email or password is wrong")
+    }
+
+    if (!user.verify) {
+        throw HttpError(401, "Email not verify")
     }
 
     const passwordCompare = await bcrypt.compare(password, user.password)
     if (!passwordCompare) {
-      throw HttpError(401, "Email or password is wrong")
+       throw HttpError(401,"Email or password is wrong")
     }
     
     const { subscription } = user
     
     const payload = {
-      id: user._id,
+        id: user._id,
     }
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "23h" });
     await User.findByIdAndUpdate(user._id, { token });
     
     res.status(200).json({
-      token,
-      user: {
-        email,
-        subscription
-      }
+        token,
+        user: {
+            email,
+            subscription
+        }
     })
-  }
-    catch (error){
-if (error.status === 401) {
-      return res.status(401).json({ message: 'Email or password is wrong' });
-    }
-    return res.status(500).json({ message: 'Internal Server Error' });
-  }
-    }
-    
+}
+
 const logout = async (req, res) => {
   const { _id } = req.user;
   await User.findByIdAndUpdate(_id, { token: '' });
@@ -137,6 +163,8 @@ const updateAvatarUser = async (req, res) => {
 
 export default {
   register: ctrlWrapper(register),
+  verify: ctrlWrapper(verify),
+  resendVerifyEmail: ctrlWrapper(resendVerifyEmail),
   login: ctrlWrapper(login),
   logout: ctrlWrapper(logout),
   getCurrent: ctrlWrapper(getCurrent),
